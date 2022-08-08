@@ -1,53 +1,5 @@
-# ✨ So you want to sponsor a contest
-
-This `README.md` contains a set of checklists for our contest collaboration.
-
-Your contest will use two repos: 
-- **a _contest_ repo** (this one), which is used for scoping your contest and for providing information to contestants (wardens)
-- **a _findings_ repo**, where issues are submitted (shared with you after the contest) 
-
-Ultimately, when we launch the contest, this contest repo will be made public and will contain the smart contracts to be reviewed and all the information needed for contest participants. The findings repo will be made public after the contest report is published and your team has mitigated the identified issues.
-
-Some of the checklists in this doc are for **C4 (🐺)** and some of them are for **you as the contest sponsor (⭐️)**.
-
----
-
-# Contest setup
-
-## ⭐️ Sponsor: Provide contest details
-
-Under "SPONSORS ADD INFO HERE" heading below, include the following:
-
-- [ ] Create a PR to this repo with the below changes:
-- [ ] Name of each contract and:
-  - [ ] source lines of code (excluding blank lines and comments) in each
-  - [ ] external contracts called in each
-  - [ ] libraries used in each
-- [ ] Describe any novel or unique curve logic or mathematical models implemented in the contracts
-- [ ] Does the token conform to the ERC-20 standard? In what specific ways does it differ?
-- [ ] Describe anything else that adds any special logic that makes your approach unique
-- [ ] Identify any areas of specific concern in reviewing the code
-- [ ] Add all of the code to this repo that you want reviewed
-
-
----
-
-# Contest prep
-
-## ⭐️ Sponsor: Contest prep
-- [ ] Provide a self-contained repository with working commands that will build (at least) all in-scope contracts, and commands that will run tests producing gas reports for the relevant contracts.
-- [ ] Make sure your code is thoroughly commented using the [NatSpec format](https://docs.soliditylang.org/en/v0.5.10/natspec-format.html#natspec-format).
-- [ ] Modify the bottom of this `README.md` file to describe how your code is supposed to work with links to any relevent documentation and any other criteria/details that the C4 Wardens should keep in mind when reviewing. ([Here's a well-constructed example.](https://github.com/code-423n4/2021-06-gro/blob/main/README.md))
-- [ ] Please have final versions of contracts and documentation added/updated in this repo **no less than 24 hours prior to contest start time.**
-- [ ] Be prepared for a 🚨code freeze🚨 for the duration of the contest — important because it establishes a level playing field. We want to ensure everyone's looking at the same code, no matter when they look during the contest. (Note: this includes your own repo, since a PR can leak alpha to our wardens!)
-- [ ] Promote the contest on Twitter (optional: tag in relevant protocols, etc.)
-- [ ] Share it with your own communities (blog, Discord, Telegram, email newsletters, etc.)
-- [ ] Optional: pre-record a high-level overview of your protocol (not just specific smart contract functions). This saves wardens a lot of time wading through documentation.
-- [ ] Delete this checklist and all text above the line below when you're ready.
-
----
-
 # Fraxlend contest details
+- $50,000 USDC total awards
 - $47,500 USDC main award pot
 - $2,500 USDC gas optimization award pot
 - Join [C4 Discord](https://discord.gg/code4rena) to register
@@ -56,4 +8,118 @@ Under "SPONSORS ADD INFO HERE" heading below, include the following:
 - Starts Aug 11, 2022 20:00 UTC
 - Ends Aug 16, 2022 20:00 UTC
 
-[ ⭐️ SPONSORS ADD INFO HERE ]
+# Building and Testing
+
+- First copy `sample.env` to `.env` and fill in archival node URLs as well as a mnemonic (hardhat only)
+- This repository contains scripts to compile and test using both Hardhat and Foundry
+    - Compile
+        - `forge build`
+        - `npx hardhat compile`
+    - Testing
+        - `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK` (mainnet forking)
+        - `forge test` (without mainnet forking)
+        - `npx hardhat test` (To enable mainnet forking, uncomment the `config.networks.hardhat.forking block` found in `./hardhat.config.ts`
+  
+
+
+<br>
+<br>
+
+# Contracts Under Review
+
+## libraries/SafeERC20.sol
+
+- Contains helper functions to wrap the symbol(), name(), and decimal() functions found in ERC20 Metadata calls
+- Contains Open-Zeppelins SafeTransfer() and SafeTransferFrom() implementations
+- LOC: 52
+
+## libraries/VaultAccount.sol
+
+- Defines the VaultAccount struct, an instance of the struct is used to keep track of the accounting for borrows and for asset lending
+- Provides helper functions for converting between shares and amounts
+- LOC: 35
+
+## LinearInterestRate.sol
+
+- Adheres to the IRateCaclulator.sol interface
+- Provides logic for calculating the new interest rate as a function of utilization %
+- Holds no state
+- See: [Fraxlend - Advanced Concepts - Linear Rate](https://docs.frax.finance/fraxlend/advanced-concepts/interest-rates#linear-rate) for an explanation of the math
+- LOC: 46
+
+## VariableInterestRate.sol
+
+- Adheres to the IRateCalculator interface
+- Provides logic for calculating the new interest rate as a function of utilization and time
+- See: [Fraxlend - Advanced Concepts - Time-Weighted Variable Rate](https://docs.frax.finance/fraxlend/advanced-concepts/interest-rates#time-weighted-variable-interest-rate) for an explanation of the math
+- LOC: 40
+
+## FraxlendWhitelist.sol
+
+- Provides 3 whitelists:
+    - RateCalculatorWhitelist - controls which calculators can be used for rate calculations
+    - OracleWhitelist - controls which oracle contracts can be used for exchange rates
+    - DeployerWhitelist - controls which addresses can deploy custom Fraxlend Pair instances
+- LOC: 29
+
+## FraxlendPairConstants.sol
+
+- Defines constants and errors only
+- Inherited by tests and FraxlendPairCore
+- LOC: 33
+
+## FraxlendPairCore.sol
+
+- Contains all external functions without access modifiers
+- Contains core logic for the pair
+- Contains all state for the pair
+- Inherited by FraxlendPair
+- **Libraries:**
+    - VaultAccount
+    - SafeERC20 (libraries/SafeERC20.sol)
+- **External Contract Interactions**:
+    - During deployment the constructor Interacts with the FraxlendWhitelist to ensure the configured oracles and rate contracts have been whitelisted
+    - During Deposit, Withdraw, Mint, Redeem, Borrow, Repay, Liquidate, RepayAssetWithCollateral, LeveragedPosition interacts with the configured asset contract
+    - During Borrow, AddCollateral, RemoveCollateral, Liquidate, RepayAssetWithCollateral, LeveragedPosition interacts with the configured collateral contract
+    - Leverage and RepayAssetWithCollateral interact with a whitelisted swapper contract which adheres to the Uniswap V2 Router interface
+    - _updateExchangeRate interacts with the two chainlink oracles
+    - _addInterst interacts with the configured Rate Calculator contract (adheres to IRateCalculator.sol interface)
+- LOC: 642
+
+## FraxlendPair.sol
+
+- Contains all view functions necessary to adhere to ERC-4626
+- Contains access controlled configuration functions including
+- SetSwapper,
+- ChangeFee
+- WithdrawFees
+- Pause/Unpause
+- SetApprovedBorrower/Lender
+- LOC: 189
+
+## FraxlendPairDeployer.sol
+
+- Contains logic to deploy two pair types: Custom and Public
+    - Public pairs are permissionlessly deployed
+    - Custom pairs have access to an extra set of configuration items not allowed to pairs deployed via the public function and are only deployable by whitelisted addresses
+- Stores information about pairs deployed like name, address, and whether they are custom pairs
+- Contains the globalPause function which bulk pauses deployed fraxlend pairs
+- **Libraries:**
+    - https://github.com/GNSPS/solidity-bytes-utils: Used to concatenate creation code during deployment
+    - Strings library from Open Zeppelin
+    - SafeERC20 (libraries/SafeERC20.sol)
+- **External Contract Interactions:**
+    - During customDeployment, calls FraxlendWhitelist to make sure deployer is on whitelist
+    - After initial deployment calls initialize() and transferOwnership() on the deployed FraxlendPair instance
+- LOC: 252
+
+## Total LOC: 1,318
+
+# Contracts Included but not under review
+
+## FraxlendPairHelper.sol
+
+- This contract contains view functions for previewing interest accrued and updating exchange rate
+- Can be helpful for predicting the effects of your transaction prior to execution
+
+
