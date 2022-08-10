@@ -63,7 +63,6 @@ abstract contract FraxlendPairConstants {
     error BadSwapper();
     error InvalidPath(address _expected, address _actual);
     error BadProtocolFee();
-    error violateMaxMintDepositRedeemWithdraw();
     error BorrowerWhitelistRequired();
     error OnlyTimeLock();
     error PriceTooLarge();
