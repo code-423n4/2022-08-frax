@@ -1,12 +1,97 @@
+# Readme
+
 # Fraxlend contest details
-- $50,000 USDC total awards
+
+- $50,000 USDC in awards
 - $47,500 USDC main award pot
 - $2,500 USDC gas optimization award pot
-- Join [C4 Discord](https://discord.gg/code4rena) to register
-- Submit findings [using the C4 form](https://code4rena.com/contests/2022-08-fraxlend-frax-finance-contest/submit)
+- Join [C4 Discord](https://discord.gg/code4rena) to register
+- Submit findings [using the C4 form](https://code4rena.com/contests/2022-08-fraxlend-contest/submit)
 - [Read our guidelines for more details](https://docs.code4rena.com/roles/wardens)
 - Starts Aug 11, 2022 20:00 UTC
 - Ends Aug 16, 2022 20:00 UTC
+
+---
+
+### [Fraxlend Documentation](https://docs.frax.finance/fraxlend/fraxlend-overview)
+
+# Introduction to Fraxlend
+
+- The Fraxlend platform allows for the deployment of Fraxlend Pairs where each pair represents an isolated lending market.
+- Each pair is configured with one asset and one collateral token, Asset Tokens are borrowed by depositing Collateral Tokens.
+- Each pair is configured to use one or two Chainlink oracle contracts to provide an exchange rate between the two assets.
+- Each pair is configured to use one Rate Calculator contracts to determine interest rates.
+
+## Pair Interaction Overview
+
+![Overview](documentation/PairOverview.png)
+
+# Deployment & Environment Setup
+
+- Fraxlend Pairs can only be deployed from the Fraxlend Pair Deployer
+- There are two ways to deploy a Fraxlend Pair:
+    - Public Deploy - available to anyone but with limited configuration
+    - Custom Deploy - available to whitelisted deployers
+- Custom Deployment is only available to addresses whitelisted for deployment
+
+## Intended Deployment Setup
+
+- Fraxlend is intended to be used with whitelisted Chainlink crypto oracles only
+- Fraxlend is intended to be used with whitelisted rate contracts **LinearInterestRate.sol** and **VariableInterestRate.sol**
+- Fraxlend does not support rebasing tokens
+- Fraxlend does not support fee-on-transfer tokens
+- COMPTROLLER_ADDRESS is a 4/7 gnosis-safe
+- CIRCUIT_BREAKER_ADDRESS is a 1/5 gnosis-safe
+- TIME_LOCK_ADDRESS is a time-delay address
+
+## Deployment steps
+
+1. Deploy rate contracts, LinearInterestRate.sol and VariableInterestRate.sol
+2. Deploy Fraxlend Whitelist and set owner to COMPTROLLER_ADDRESS
+3. Whitelist intended oracles (chainlink crypto only, no FRAX oracles)
+    1. Use $USD value for $FRAX, no $FRAX price oracles whitelisted.
+4. Whitelist intended rateContracts from step 1
+5. Whitelist intended custom deployment addresses
+6. Deploy Fraxlend Deployer with proper constructor arguments and set owner to COMPTROLLER_ADDRESS
+
+## Oracle Configuration
+
+- Each Fraxlend Pair takes in two oracle addresses and a normalization parameter.  The normalization parameter helps account for oracle count and for different decimal values between asset and collateral.
+- **exchangeRate** is a uint224 value and represents the amount of collateral to get 1e18 asset (collateral/asset)
+- `_oracleMultiply` - is the chainlink oracle which forms the numerator of the exchange rate
+- `_oracleDivide` - is the chainlink oracle address which forms the denominator of the exchange rate
+- `_oracleNormalization` - is a value which accounts for differences in precision across both oracles and the asset and denominator
+    - It is calculated as: 1^(18 + precision of numerator oracle - precision of denominator oracle + precision of asset token - precision of collateral token)
+
+## Example Deployment Configuration
+
+The deploy() function takes a single abi encoded bytes array as an argument:
+
+```solidity
+// Frax asset (1e18 precision), WETH collateral (1e18 precision)
+bytes memory _configData = abi.encode(
+	FRAX_ERC20_ADDRESS, // asset
+	WETH_ERC20_ADDRESS, // collateral
+	address(0), // numerator oracle
+	CHAINLINK_USD_ETH_ADDRESS, // denominator oracle
+	1e10, // oracle normalization (18 + 0 - 8 + 18 - 18)
+	VARIABLE_RATE_CONTRACT_ADDRESS,
+	abi.encode() // No init for variable rate contract
+);
+
+// MKR asset (1e18 precision), WBTC collateral (1e8 precision)
+bytes memory _configData = abi.encode(
+	MKR_ERC20_ADDRESS, // asset
+	WBTC_ERC20_ADDRESS, // collateral
+	CHAINLINK_USD_WBTC, // numerator oracle (1e8 precision)
+	CHAINLINK_USD_ETH_ADDRESS, // denominator oracle (1e8) precision
+	1e28, // oracle normalization (18 + 18 - 8 + 8 - 8)
+	VARIABLE_RATE_CONTRACT_ADDRESS,
+	abi.encode() // No init for variable rate contract
+);
+
+fraxlendPairDeployer.deploy(_configData);
+```
 
 # Building and Testing
 
@@ -18,29 +103,50 @@
     - Testing
         - `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK` (mainnet forking)
         - `forge test` (without mainnet forking)
-  
 
+# Known Issues
 
-<br>
-<br>
+### Misconfigured Oracles
+
+- It is possible to misconfigure pairs and choose oracles and oracle normalization that do not match the assets
+- Assume that oracles and normalization are properly configured
+
+### Low borrow balance combined with low interest rates
+
+- When there is an exceptionally low borrow balance and a low interest rate, interest does not accrue
+
+### Custom Deployment Misconfiguration
+
+- The custom deployment gives significantly more control to deployers, assume that deployer makes reasonable configuration choices on liquidationFee, maxLTV, penaltyRate etc.
+- When making under-collateralized loans, lenders know and trust the counter-party
+
+### Chainlink Oracle
+
+- Chainlink oracles can provide outdated answers
+- Very large chainlink oracle prices can cause overflow when calculating and when casting to uint224
+
+### Frax Price Volatility
+
+- Because $FRAX is treated as having a price of $1, $FRAX price volatility could cause bad debt or unnecessary liquidations
 
 # Contracts Under Review
 
 ## libraries/SafeERC20.sol
 
+- libraries/SafeERC20.sol
 - Contains helper functions to wrap the symbol(), name(), and decimal() functions found in ERC20 Metadata calls
 - Contains Open-Zeppelins SafeTransfer() and SafeTransferFrom() implementations
 - LOC: 52
 
 ## libraries/VaultAccount.sol
 
-- Defines the VaultAccount struct, an instance of the struct is used to keep track of the accounting for borrows and for asset lending
+- Defines the VaultAccount struct, an instance of the struct is used to keep track of the accounting for borrows and for asset lending (see [Fraxlend - Advanced Concepts - Vault Accoun](https://www.notion.so/Contracts-Under-Review-b37a6521ca4a474aa37cdef5dbf95f7b)[t](https://docs.frax.finance/fraxlend/advanced-concepts/vault-account))
 - Provides helper functions for converting between shares and amounts
 - LOC: 35
 
 ## LinearInterestRate.sol
 
-- Adheres to the IRateCaclulator.sol interface
+- Adheres to the IRateCalculator.sol interface
 - Provides logic for calculating the new interest rate as a function of utilization %
 - Holds no state
 - See: [Fraxlend - Advanced Concepts - Linear Rate](https://docs.frax.finance/fraxlend/advanced-concepts/interest-rates#linear-rate) for an explanation of the math
@@ -82,7 +188,7 @@
     - During Borrow, AddCollateral, RemoveCollateral, Liquidate, RepayAssetWithCollateral, LeveragedPosition interacts with the configured collateral contract
     - Leverage and RepayAssetWithCollateral interact with a whitelisted swapper contract which adheres to the Uniswap V2 Router interface
     - _updateExchangeRate interacts with the two chainlink oracles
-    - _addInterst interacts with the configured Rate Calculator contract (adheres to IRateCalculator.sol interface)
+    - _addInterest interacts with the configured Rate Calculator contract (adheres to IRateCalculator.sol interface)
 - LOC: 642
 
 ## FraxlendPair.sol
@@ -120,5 +226,3 @@
 
 - This contract contains view functions for previewing interest accrued and updating exchange rate
 - Can be helpful for predicting the effects of your transaction prior to execution
-
-
