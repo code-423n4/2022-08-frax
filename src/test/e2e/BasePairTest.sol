@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "../../contracts/FraxlendPairConstants.sol";
 import "../../contracts/FraxlendPairDeployer.sol";
 import "../../contracts/FraxlendPairHelper.sol";
@@ -32,6 +33,8 @@ library OracleHelper {
             abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
             abi.encode(uint80(0), int256((numerator * 10**_oracle.decimals()) / denominator), 0, 0, uint80(0))
         );
+        vm.warp(block.timestamp + 15);
+        vm.roll(block.number + 1);
     }
 }
 
@@ -53,6 +56,18 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
     AggregatorV3Interface public oracleMultiply;
     uint256 public oracleNormalization;
 
+    struct PairAccounting {
+        uint128 totalAssetAmount;
+        uint128 totalAssetShares;
+        uint128 totalBorrowAmount;
+        uint128 totalBorrowShares;
+        uint256 totalCollateral;
+    }
+
+    PairAccounting public initial;
+    PairAccounting public final_;
+    PairAccounting public net;
+
     // Users
     address[] public users = [vm.addr(1), vm.addr(2), vm.addr(3), vm.addr(4), vm.addr(5)];
 
@@ -73,6 +88,47 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
     // Deployer constants
     uint256 internal constant DEFAULT_MAX_LTV = 75000; // 75% with 1e5 precision
     uint256 internal constant DEFAULT_LIQ_FEE = 500; // 5% with 1e5 precision
+
+    // Interest Helpers
+    uint256 internal constant ONE_PERCENT_ANNUAL_RATE = 14624850;
+
+    function takeInitialAccountingSnapshot(FraxlendPair _fraxlendPair) internal {
+        (
+            uint128 _totalAssetAmount,
+            uint128 _totalAssetShares,
+            uint128 _totalBorrowAmount,
+            uint128 _totalBorrowShares,
+            uint256 _totalCollateral
+        ) = fraxlendPairHelper.getPairAccounting(address(_fraxlendPair));
+        initial.totalAssetAmount = _totalAssetAmount;
+        initial.totalAssetShares = _totalAssetShares;
+        initial.totalBorrowAmount = _totalBorrowAmount;
+        initial.totalBorrowShares = _totalBorrowShares;
+        initial.totalCollateral = _totalCollateral;
+    }
+
+    function takeFinalAccountingSnapshot(FraxlendPair _fraxlendPair) internal {
+        (
+            uint128 _totalAssetAmount,
+            uint128 _totalAssetShares,
+            uint128 _totalBorrowAmount,
+            uint128 _totalBorrowShares,
+            uint256 _totalCollateral
+        ) = fraxlendPairHelper.getPairAccounting(address(_fraxlendPair));
+        final_.totalAssetAmount = _totalAssetAmount;
+        final_.totalAssetShares = _totalAssetShares;
+        final_.totalBorrowAmount = _totalBorrowAmount;
+        final_.totalBorrowShares = _totalBorrowShares;
+        final_.totalCollateral = _totalCollateral;
+    }
+
+    function setNetAccountingSnapshot(PairAccounting memory _first, PairAccounting memory _second) internal {
+        net.totalAssetAmount = _first.totalAssetAmount - _second.totalAssetAmount;
+        net.totalAssetShares = _first.totalAssetShares - _second.totalAssetShares;
+        net.totalBorrowAmount = _first.totalBorrowAmount - _second.totalBorrowAmount;
+        net.totalBorrowShares = _first.totalBorrowShares - _second.totalBorrowShares;
+        net.totalCollateral = _first.totalCollateral - _second.totalCollateral;
+    }
 
     /// @notice The ```defaultRateInitForLinear``` function generates some default init data for use in deployments
     function defaultRateInitForLinear() public view returns (bytes memory) {
@@ -102,6 +158,10 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
         deployer.setCreationCode(type(FraxlendPair).creationCode);
         variableRateContract = new VariableInterestRate();
         linearRateContract = new LinearInterestRate();
+        console.log(
+            "file: BasePairTest.sol ~ line 109 ~ deployNonDynamicExternalContracts ~ linearRateContract",
+            address(linearRateContract)
+        );
     }
 
     function fuzzyRateCalculator(
@@ -370,6 +430,11 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
         stdstore.target(address(_contract)).sig(_contract.balanceOf.selector).with_key(_user).checked_write(_amount);
     }
 
+    struct LendAction {
+        address user;
+        uint256 lendAmount;
+    }
+
     // helper to approve and lend in one step
     function lendTokenViaDeposit(uint256 _amount, address _user) internal returns (uint256) {
         vm.startPrank(_user);
@@ -385,9 +450,20 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
         uint256 _amount,
         address _user
     ) internal returns (uint256) {
+        startHoax(_user);
         IERC20(_pair.asset()).approve(address(_pair), _amount);
-        FraxlendPair(_pair).deposit(_amount, _user);
+        _pair.deposit(_amount, _user);
+        vm.stopPrank();
         return pair.balanceOf(_user);
+    }
+
+    function lendTokenViaDepositWithFaucet(FraxlendPair _pair, LendAction memory _lendAction)
+        internal
+        returns (uint256)
+    {
+        faucetFunds(IERC20(_pair.asset()), _lendAction.lendAmount, _lendAction.user);
+        console.log("file: BasePairTest.sol ~ line 408 ~ )internalreturns ~ _lendAction.user", _lendAction.user);
+        return lendTokenViaDeposit(_pair, _lendAction.lendAmount, _lendAction.user);
     }
 
     // helper to approve and lend in one step
@@ -398,6 +474,12 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
         pair.deposit(_amount, _user);
         vm.stopPrank();
         return pair.balanceOf(_user);
+    }
+
+    struct BorrowAction {
+        address user;
+        uint256 borrowAmount;
+        uint256 collateralAmount;
     }
 
     // helper to approve and lend in one step
@@ -412,6 +494,18 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
         _finalShares = pair.userBorrowShares(_user);
         _finalCollateralBalance = pair.userCollateralBalance(_user);
         vm.stopPrank();
+    }
+
+    function borrowTokenWithFaucet(FraxlendPair _fraxlendPair, BorrowAction memory _borrowAction)
+        internal
+        returns (uint256 _finalShares, uint256 _finalCollateralBalance)
+    {
+        faucetFunds(_fraxlendPair.collateralContract(), _borrowAction.collateralAmount, _borrowAction.user);
+        (_finalShares, _finalCollateralBalance) = borrowToken(
+            _borrowAction.borrowAmount,
+            _borrowAction.collateralAmount,
+            _borrowAction.user
+        );
     }
 
     // helper to approve and repay in one step, should have called addInterest before hand
@@ -498,5 +592,13 @@ contract BasePairTest is FraxlendPairConstants, Scenarios, Test {
 
     function feeToProtocolRate(FraxlendPair _pair) internal view returns (uint64 _feeToProtocolRate) {
         (, _feeToProtocolRate, , ) = _pair.currentRateInfo();
+    }
+
+    function getCollateralAmount(
+        uint256 _borrowAmount,
+        uint256 _exchangeRate,
+        uint256 _targetLTV
+    ) internal pure returns (uint256 _collateralAmount) {
+        _collateralAmount = (_borrowAmount * _exchangeRate * LTV_PRECISION) / (_targetLTV * EXCHANGE_PRECISION);
     }
 }
