@@ -30,6 +30,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "./FraxlendPairConstants.sol";
 import "./libraries/VaultAccount.sol";
@@ -45,6 +46,7 @@ import "./interfaces/ISwapper.sol";
 abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ownable, Pausable, ReentrancyGuard {
     using VaultAccountingLibrary for VaultAccount;
     using SafeERC20 for IERC20;
+    using SafeCast for uint256;
 
     string public version = "1.0.0";
 
@@ -317,11 +319,6 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         return maturityDate != 0 && block.timestamp > maturityDate;
     }
 
-    function _castUint128(uint256 _num) internal pure returns (uint128) {
-        if (_num >= type(uint128).max) revert violateMaxMintDepositRedeemWithdraw();
-        return uint128(_num);
-    }
-
     // ============================================================================================
     // Modifiers
     // ============================================================================================
@@ -592,7 +589,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         _addInterest();
         VaultAccount memory _totalAsset = totalAsset;
         _sharesReceived = _totalAsset.toShares(_amount, false);
-        _deposit(_totalAsset, _castUint128(_amount), _castUint128(_sharesReceived), _receiver);
+        _deposit(_totalAsset, _amount.toUint128(), _sharesReceived.toUint128(), _receiver);
     }
 
     /// @notice The ```mint``` function allows a user to Lend assets by specifying the number of Assets Shares (fTokens) to mint
@@ -611,7 +608,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         _addInterest();
         VaultAccount memory _totalAsset = totalAsset;
         _amountReceived = _totalAsset.toAmount(_shares, true);
-        _deposit(_totalAsset, _castUint128(_amountReceived), _castUint128(_shares), _receiver);
+        _deposit(_totalAsset, _amountReceived.toUint128(), _shares.toUint128(), _receiver);
     }
 
     /// @notice The ```_redeem``` function is an internal implementation which allows a Lender to pull their Asset Tokens out of the Pair
@@ -666,7 +663,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         _addInterest();
         VaultAccount memory _totalAsset = totalAsset;
         _amountToReturn = _totalAsset.toAmount(_shares, false);
-        _redeem(_totalAsset, _castUint128(_amountToReturn), _castUint128(_shares), _receiver, _owner);
+        _redeem(_totalAsset, _amountToReturn.toUint128(), _shares.toUint128(), _receiver, _owner);
     }
 
     /// @notice The ```withdraw``` function allows a user to redeem their Asset Shares for a specified amount of Asset Tokens
@@ -682,7 +679,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         _addInterest();
         VaultAccount memory _totalAsset = totalAsset;
         _shares = _totalAsset.toShares(_amount, true);
-        _redeem(_totalAsset, _castUint128(_amount), _castUint128(_shares), _receiver, _owner);
+        _redeem(_totalAsset, _amount.toUint128(), _shares.toUint128(), _receiver, _owner);
     }
 
     // ============================================================================================
@@ -755,7 +752,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         if (_collateralAmount > 0) {
             _addCollateral(msg.sender, _collateralAmount, msg.sender);
         }
-        _shares = _borrowAsset(_castUint128(_borrowAmount), _receiver);
+        _shares = _borrowAsset(_borrowAmount.toUint128(), _receiver);
     }
 
     event AddCollateral(address indexed _sender, address indexed _borrower, uint256 _collateralAmount);
@@ -884,7 +881,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         _addInterest();
         VaultAccount memory _totalBorrow = totalBorrow;
         _amountToRepay = _totalBorrow.toAmount(_shares, true);
-        _repayAsset(_totalBorrow, _castUint128(_amountToRepay), _castUint128(_shares), msg.sender, _borrower);
+        _repayAsset(_totalBorrow, _amountToRepay.toUint128(), _shares.toUint128(), msg.sender, _borrower);
     }
 
     // ============================================================================================
@@ -927,7 +924,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         // Effects & Interactions
         // NOTE: reverts if _shares > userBorrowShares
         uint256 _amountToRepay = _totalBorrow.toAmount(_shares, true);
-        _repayAsset(_totalBorrow, _castUint128(_amountToRepay), _castUint128(_shares), msg.sender, _borrower); // liquidator repays shares on behalf of borrower
+        _repayAsset(_totalBorrow, _amountToRepay.toUint128(), _shares.toUint128(), msg.sender, _borrower); // liquidator repays shares on behalf of borrower
         // NOTE: reverts if _collateralForLiquidator > userCollateralBalance
         // Collateral is removed on behalf of borrower and sent to liquidator
         _removeCollateral(_collateralForLiquidator, msg.sender, _borrower);
@@ -1000,7 +997,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
 
         // Debit borrowers account
         // setting recipient to address(this) means no transfer will happen
-        uint256 _borrowShares = _borrowAsset(_castUint128(_borrowAmount), address(this));
+        uint256 _borrowShares = _borrowAsset(_borrowAmount.toUint128(), address(this));
 
         // Interactions
         _assetContract.approve(_swapperAddress, _borrowAmount);
@@ -1109,13 +1106,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
 
         // Effects: write to state
         // Note: setting _payer to address(this) means no actual transfer will occur.  Contract already has funds
-        _repayAsset(
-            _totalBorrow,
-            _castUint128(_amountAssetOut),
-            _castUint128(_sharesToRepay),
-            address(this),
-            msg.sender
-        );
+        _repayAsset(_totalBorrow, _amountAssetOut.toUint128(), _sharesToRepay.toUint128(), address(this), msg.sender);
 
         emit RepayAssetWithCollateral(msg.sender, _swapperAddress, _collateralToSwap, _amountAssetOut, _sharesToRepay);
     }
