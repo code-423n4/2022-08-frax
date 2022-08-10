@@ -356,6 +356,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         _;
     }
 
+    /// @notice Ensure function is not called when passed maturity
     modifier isNotPastMaturity() {
         if (_isPastMaturity()) {
             revert PastMaturity();

@@ -18,7 +18,6 @@
     - Testing
         - `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK` (mainnet forking)
         - `forge test` (without mainnet forking)
-        - `npx hardhat test` (To enable mainnet forking, uncomment the `config.networks.hardhat.forking block` found in `./hardhat.config.ts`
   
 
 

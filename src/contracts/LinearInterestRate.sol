@@ -35,14 +35,20 @@ contract LinearInterestRate is IRateCalculator {
     uint256 private constant MAX_VERTEX_UTIL = 1e5; // 100%
     uint256 private constant UTIL_PREC = 1e5;
 
+    /// @notice The ```name``` function returns the name of the rate contract
+    /// @return memory name of contract
     function name() external pure returns (string memory) {
         return "Linear Interest Rate";
     }
 
+    /// @notice The ```getConstants``` function returns abi encoded constants
+    /// @return _calldata abi.encode(uint256 MIN_INT, uint256 MAX_INT, uint256 MAX_VERTEX_UTIL, uint256 UTIL_PREC)
     function getConstants() external pure returns (bytes memory _calldata) {
         return abi.encode(MIN_INT, MAX_INT, MAX_VERTEX_UTIL, UTIL_PREC);
     }
 
+    /// @notice The ```requireValidInitData``` function reverts if initialization data fails to be validated
+    /// @param _initData abi.encode(uint256 _minInterest, uint256 _vertexInterest, uint256 _maxInterest, uint256 _vertexUtilization)
     function requireValidInitData(bytes calldata _initData) public pure {
         (uint256 _minInterest, uint256 _vertexInterest, uint256 _maxInterest, uint256 _vertexUtilization) = abi.decode(
             _initData,

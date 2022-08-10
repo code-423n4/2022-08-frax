@@ -177,10 +177,16 @@ contract FraxlendPair is FraxlendPairCore {
         _MAX_PROTOCOL_FEE = MAX_PROTOCOL_FEE;
     }
 
+    /// @notice The ```toBorrowShares``` function converts a given amount of borrow debt into the number of shares
+    /// @param _amount Amount of borrow
+    /// @param _roundUp Whether to roundup during division
     function toBorrowShares(uint256 _amount, bool _roundUp) external view returns (uint256) {
         return totalBorrow.toShares(_amount, _roundUp);
     }
 
+    /// @notice The ```toBorrtoBorrowAmountowShares``` function converts a given amount of borrow debt into the number of shares
+    /// @param _shares Shares of borrow
+    /// @param _roundUp Whether to roundup during division
     function toBorrowAmount(uint256 _shares, bool _roundUp) external view returns (uint256) {
         return totalBorrow.toAmount(_shares, _roundUp);
     }
@@ -190,13 +196,19 @@ contract FraxlendPair is FraxlendPairCore {
     // ============================================================================================
     event SetTimeLock(address _newAddress);
 
+    /// @notice The ```setTimeLock``` function sets the TIME_LOCK address
+    /// @param _newAddress the new time lock address
     function setTimeLock(address _newAddress) external onlyOwner {
         TIME_LOCK_ADDRESS = _newAddress;
         emit SetTimeLock(_newAddress);
     }
 
+    /// @notice The ```ChangeFee``` event first when the fee is changed
+    /// @param _newFee The new fee
     event ChangeFee(uint32 _newFee);
 
+    /// @notice The ```changeFee``` function changes the protocol fee, max 50%
+    /// @param _newFee The new fee
     function changeFee(uint32 _newFee) external whenNotPaused {
         if (msg.sender != TIME_LOCK_ADDRESS) revert OnlyTimeLock();
         if (_newFee > MAX_PROTOCOL_FEE) {
@@ -206,8 +218,16 @@ contract FraxlendPair is FraxlendPairCore {
         emit ChangeFee(_newFee);
     }
 
+    /// @notice The ```WithdrawFees``` event fires when the fees are withdrawn
+    /// @param _shares Number of _shares (fTokens) redeemed
+    /// @param _recipient To whom the assets were sent
+    /// @param _amountToTransfer The amount of fees redeemed
     event WithdrawFees(uint128 _shares, address _recipient, uint256 _amountToTransfer);
 
+    /// @notice The ```withdrawFees``` function withdraws fees accumulated
+    /// @param _shares Number of fTokens to redeem
+    /// @param _recipient Address to send the assets
+    /// @return _amountToTransfer Amount of assets sent to recipient
     function withdrawFees(uint128 _shares, address _recipient) external onlyOwner returns (uint256 _amountToTransfer) {
         // Grab some data from state to save gas
         VaultAccount memory _totalAsset = totalAsset;
@@ -239,15 +259,29 @@ contract FraxlendPair is FraxlendPairCore {
         emit WithdrawFees(_shares, _recipient, _amountToTransfer);
     }
 
+    /// @notice The ```SetSwapper``` event fires whenever a swapper is black or whitelisted
+    /// @param _swapper The swapper address
+    /// @param _approval The approval
     event SetSwapper(address _swapper, bool _approval);
 
+    /// @notice The ```setSwapper``` function is called to black or whitelist a given swapper address
+    /// @dev
+    /// @param _swapper The swapper address
+    /// @param _approval The approval
     function setSwapper(address _swapper, bool _approval) external onlyOwner {
         swappers[_swapper] = _approval;
         emit SetSwapper(_swapper, _approval);
     }
 
+    /// @notice The ```SetApprovedLender``` event fires when a lender is black or whitelisted
+    /// @param _address The address
+    /// @param _approval The approval
     event SetApprovedLender(address indexed _address, bool _approval);
 
+    /// @notice The ```setApprovedLenders``` function sets a given set of addresses to the whitelist
+    /// @dev Cannot black list self
+    /// @param _lenders The addresses whos status will be set
+    /// @param _approval The approcal status
     function setApprovedLenders(address[] calldata _lenders, bool _approval) external approvedLender(msg.sender) {
         for (uint256 i = 0; i < _lenders.length; i++) {
             // Do not set when _approval == false and _lender == msg.sender
@@ -258,8 +292,15 @@ contract FraxlendPair is FraxlendPairCore {
         }
     }
 
+    /// @notice The ```SetApprovedBorrower``` event fires when a borrower is black or whitelisted
+    /// @param _address The address
+    /// @param _approval The approval
     event SetApprovedBorrower(address indexed _address, bool _approval);
 
+    /// @notice The ```setApprovedBorrowers``` function sets a given array of addresses to the whitelist
+    /// @dev Cannot black list self
+    /// @param _borrowers The addresses whos status will be set
+    /// @param _approval The approcal status
     function setApprovedBorrowers(address[] calldata _borrowers, bool _approval) external approvedBorrower {
         for (uint256 i = 0; i < _borrowers.length; i++) {
             // Do not set when _approval == false and _borrower == msg.sender
