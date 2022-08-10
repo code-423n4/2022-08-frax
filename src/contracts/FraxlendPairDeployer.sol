@@ -111,10 +111,14 @@ contract FraxlendPairDeployer is Ownable {
     // Functions: View Functions
     // ============================================================================================
 
+    /// @notice The ```deployedPairsLength``` function returns the length of the deployedPairsArray
+    /// @return length of array
     function deployedPairsLength() external view returns (uint256) {
         return deployedPairsArray.length;
     }
 
+    /// @notice The ```getAllPairAddresses``` function returns all pair addresses in deployedPairsArray
+    /// @return memory All deployed pair addresses
     function getAllPairAddresses() external view returns (address[] memory) {
         string[] memory _deployedPairsArray = deployedPairsArray;
         uint256 _lengthOfArray = _deployedPairsArray.length;
@@ -134,10 +138,17 @@ contract FraxlendPairDeployer is Ownable {
         bool _isCustom;
     }
 
-    function getCustomStatuses(address[] calldata _addresses) external view returns (PairCustomStatus[] memory) {
+    /// @notice The ```getCustomStatuses``` function returns an array of structs which contain the address and custom status
+    /// @param _addresses Addresses to check for custom status
+    /// @return _pairCustomStatuses memory Array of structs containing information
+    function getCustomStatuses(address[] calldata _addresses)
+        external
+        view
+        returns (PairCustomStatus[] memory _pairCustomStatuses)
+    {
         uint256 _lengthOfArray = _addresses.length;
         uint256 i;
-        PairCustomStatus[] memory _pairCustomStatuses = new PairCustomStatus[](_lengthOfArray);
+        _pairCustomStatuses = new PairCustomStatus[](_lengthOfArray);
         for (i = 0; i < _lengthOfArray; ) {
             _pairCustomStatuses[i] = PairCustomStatus({
                 _address: _addresses[i],
@@ -251,6 +262,13 @@ contract FraxlendPairDeployer is Ownable {
         _fraxlendPair.transferOwnership(COMPTROLLER_ADDRESS);
     }
 
+    /// @notice The ```_logDeploy``` function emits a LogDeploy event
+    /// @param _name The name of the Pair
+    /// @param _pairAddress The address of the Pair
+    /// @param _configData abi.encode(address _asset, address _collateral, address _oracleMultiply, address _oracleDivide, uint256 _oracleNormalization, address _rateContract, bytes memory _rateInitData)
+    /// @param _maxLTV The Maximum Loan-To-Value for a borrower to be considered solvent (1e5 precision)
+    /// @param _liquidationFee The fee paid to liquidators given as a % of the repayment (1e5 precision)
+    /// @param _maturityDate The maturityDate of the Pair
     function _logDeploy(
         string memory _name,
         address _pairAddress,
@@ -373,6 +391,10 @@ contract FraxlendPairDeployer is Ownable {
     // Functions: Admin
     // ============================================================================================
 
+    /// @notice The ```globalPause``` function calls the pause() function on a given set of pair addresses
+    /// @dev Ignores reverts when calling pause()
+    /// @param _addresses Addresses to attempt to pause()
+    /// @return _updatedAddresses Addresses for which pause() was successful
     function globalPause(address[] memory _addresses) external returns (address[] memory _updatedAddresses) {
         require(msg.sender == CIRCUIT_BREAKER_ADDRESS, "Circuit Breaker only");
         address _pairAddress;

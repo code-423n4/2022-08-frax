@@ -41,14 +41,19 @@ contract VariableInterestRate is IRateCalculator {
     uint64 private constant MAX_INT = 146248508681; // 10,000% annual rate
     uint256 private constant INT_HALF_LIFE = 43200e36; // given in seconds, equal to 12 hours, additional 1e36 to make math simpler
 
+    /// @notice The ```name``` function returns the name of the rate contract
+    /// @return memory name of contract
     function name() external pure returns (string memory) {
         return "Variable Time-Weighted Interest Rate";
     }
 
+    /// @notice The ```getConstants``` function returns abi encoded constants
+    /// @return _calldata abi.encode(uint32 MIN_UTIL, uint32 MAX_UTIL, uint32 UTIL_PREC, uint64 MIN_INT, uint64 MAX_INT, uint256 INT_HALF_LIFE)
     function getConstants() external pure returns (bytes memory _calldata) {
         return abi.encode(MIN_UTIL, MAX_UTIL, UTIL_PREC, MIN_INT, MAX_INT, INT_HALF_LIFE);
     }
 
+    /// @notice The ```requireValidInitData``` function No-op as this contract has no init data
     function requireValidInitData(bytes calldata _initData) external pure {}
 
     /// @notice The ```getNewRate``` function calculates the new interest rate as a function of time and utilization
