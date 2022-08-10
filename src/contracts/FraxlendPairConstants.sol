@@ -66,4 +66,5 @@ abstract contract FraxlendPairConstants {
     error BorrowerWhitelistRequired();
     error OnlyTimeLock();
     error PriceTooLarge();
+    error PastDeadline(uint256 _blockTimestamp, uint256 _deadline);
 }

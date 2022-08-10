@@ -5,6 +5,8 @@ import "./BasePairTest.sol";
 
 contract LiquidatePairTest is BasePairTest {
     using OracleHelper for AggregatorV3Interface;
+    using SafeCast for uint256;
+
 
     function testLiquidate() public {
         // Setup contracts
@@ -24,11 +26,11 @@ contract LiquidatePairTest is BasePairTest {
         lendTokenViaDeposit(_amountInPool, users[0]);
         borrowToken(uint128(_amountToBorrow), _collateralAmount, users[2]);
         uint256 mxltv = pair.maxLTV();
-        uint256 liquidationFee = pair.liquidationFee();
-        uint256 liquidation_price = ((((1e18 / _exchangeRate) * mxltv) / 1e5) * (1e5 + liquidationFee)) / 1e5;
+        uint256 cleanLiquidationFee = pair.cleanLiquidationFee();
+        uint256 liquidation_price = ((((1e18 / _exchangeRate) * mxltv) / 1e5) * (1e5 + cleanLiquidationFee)) / 1e5;
         oracleDivide.setPrice(liquidation_price, 1, vm);
         mineBlocks(1);
-        uint256 _shares = pair.userBorrowShares(users[2]);
+        uint128 _shares = pair.userBorrowShares(users[2]).toUint128();
         for (uint256 i = 0; i < 1; i++) {
             pair.addInterest();
             mineOneBlock();
@@ -54,7 +56,7 @@ contract LiquidatePairTest is BasePairTest {
         faucetFunds(collateral, _collateralAmount);
         lendTokenViaDeposit(_amountInPool, users[0]);
         borrowToken(uint128(_amountToBorrow), _collateralAmount, users[2]);
-        uint256 _shares = pair.userBorrowShares(users[2]);
+        uint128 _shares = pair.userBorrowShares(users[2]).toUint128();
         for (uint256 i = 0; i < 100; i++) {
             pair.addInterest();
             mineOneBlock();
@@ -63,37 +65,6 @@ contract LiquidatePairTest is BasePairTest {
         pair.addInterest();
         asset.approve(address(pair), toBorrowAmount(_shares, true));
         vm.expectRevert(FraxlendPairConstants.BorrowerSolvent.selector);
-        pair.liquidate(_shares, users[2]);
-        vm.stopPrank();
-        // assertEq(pair.userBorrowShares(users[2]), 0);
-    }
-
-    function testCannotLiquidateWhenCollateralCannotCover() public {
-        // Setup contracts
-        defaultSetUp();
-
-        // Test Starts
-        uint256 _amountToBorrow = 12e23; // 1.2m
-        uint256 _amountInPool = 15e23; // 1.5m
-        mineOneBlock();
-        oracleDivide.setPrice(3200, 1, vm);
-        mineOneBlock();
-
-        // collateral is 1.5 times borrow amount
-        uint256 _exchangeRate = pair.updateExchangeRate();
-        uint256 _collateralAmount = (_amountToBorrow * _exchangeRate * 3) / (2 * 1e18);
-        faucetFunds(asset, _amountInPool);
-        faucetFunds(collateral, _collateralAmount);
-        lendTokenViaDeposit(_amountInPool, users[0]);
-        borrowToken(uint128(_amountToBorrow), _collateralAmount, users[2]);
-        oracleDivide.setPrice(500, 1, vm);
-        mineOneBlock();
-        uint256 _shares = pair.userBorrowShares(users[2]);
-        addInterestAndMineBulk(100);
-        vm.startPrank(users[1]);
-        pair.addInterest();
-        asset.approve(address(pair), toBorrowAmount(_shares, true));
-        vm.expectRevert(stdError.arithmeticError);
         pair.liquidate(_shares, users[2]);
         vm.stopPrank();
         // assertEq(pair.userBorrowShares(users[2]), 0);

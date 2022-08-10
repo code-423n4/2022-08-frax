@@ -67,7 +67,8 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
     uint256 public immutable maxLTV;
 
     // Liquidation Fee
-    uint256 public immutable liquidationFee;
+    uint256 public immutable cleanLiquidationFee;
+    uint256 public immutable dirtyLiquidationFee;
 
     // Interest Rate Calculator Contract
     IRateCalculator public immutable rateContract; // For complex rate calculations
@@ -189,7 +190,8 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
             assetContract = IERC20(_asset);
             collateralContract = IERC20(_collateral);
             currentRateInfo.feeToProtocolRate = DEFAULT_PROTOCOL_FEE;
-            liquidationFee = _liquidationFee;
+            cleanLiquidationFee = _liquidationFee;
+            dirtyLiquidationFee = (_liquidationFee * 9000) / LIQ_PRECISION; // 90% of clean fee
 
             if (_maxLTV >= LTV_PRECISION && !_isBorrowerWhitelistActive) revert BorrowerWhitelistRequired();
             maxLTV = _maxLTV;
@@ -890,8 +892,16 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
     /// @notice The ```Liquidate``` event is emitted when a liquidation occurs
     /// @param _borrower The borrower account for which the liquidation occured
     /// @param _collateralForLiquidator The amount of Collateral Token transferred to the liquidator
-    /// @param _shares The number of Borrow Shares the liquidator repaid on behalf of the borrower
-    event Liquidate(address indexed _borrower, uint256 _collateralForLiquidator, uint256 _shares);
+    /// @param _sharesToLiquidate The number of Borrow Shares the liquidator repaid on behalf of the borrower
+    /// @param _sharesToAdjust The number of Borrow Shares that were adjusted on liabilites and assets (a writeoff)
+    event Liquidate(
+        address indexed _borrower,
+        uint256 _collateralForLiquidator,
+        uint256 _sharesToLiquidate,
+        uint256 _amountLiquidatorToRepay,
+        uint256 _sharesToAdjust,
+        uint256 _amountToAdjust
+    );
 
     /// @notice The ```liquidate``` function allows a third party to repay a borrower's debt if they have become insolvent
     /// @dev Caller must invoke ```ERC20.approve``` on the Asset Token contract prior to calling ```Liquidate()```
@@ -918,7 +928,7 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         // Determine how much of the borrow and collateral will be repaid
         _collateralForLiquidator =
             (((_totalBorrow.toAmount(_shares, false) * _exchangeRate) / EXCHANGE_PRECISION) *
-                (LIQ_PRECISION + liquidationFee)) /
+                (LIQ_PRECISION + cleanLiquidationFee)) /
             LIQ_PRECISION;
 
         // Effects & Interactions
@@ -928,7 +938,97 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
         // NOTE: reverts if _collateralForLiquidator > userCollateralBalance
         // Collateral is removed on behalf of borrower and sent to liquidator
         _removeCollateral(_collateralForLiquidator, msg.sender, _borrower);
-        emit Liquidate(_borrower, _collateralForLiquidator, _shares);
+        emit Liquidate(_borrower, _collateralForLiquidator, _shares, 0, 0, 0);
+    }
+
+    /// @notice The ```liquidateClean``` function allows a third party to repay a borrower's debt if they have become insolvent
+    /// @dev Caller must invoke ```ERC20.approve``` on the Asset Token contract prior to calling ```Liquidate()```
+    /// @param _sharesToLiquidate The number of Borrow Shares repaid by the liquidator
+    /// @param _deadline The timestamp after which tx will revert
+    /// @param _borrower The account for which the repayment is credited and from whom collateral will be taken
+    /// @return _collateralForLiquidator The amount of Collateral Token transferred to the liquidator
+    function liquidateClean(
+        uint128 _sharesToLiquidate,
+        uint256 _deadline,
+        address _borrower
+    ) external whenNotPaused nonReentrant approvedLender(msg.sender) returns (uint256 _collateralForLiquidator) {
+        if (block.timestamp > _deadline) revert PastDeadline(block.timestamp, _deadline);
+
+        _addInterest();
+        uint256 _exchangeRate = _updateExchangeRate();
+
+        if (_isSolvent(_borrower, _exchangeRate)) {
+            revert BorrowerSolvent();
+        }
+
+        // Read from state
+        VaultAccount memory _totalBorrow = totalBorrow;
+        uint256 _userCollateralBalance = userCollateralBalance[_borrower];
+        uint128 _borrowerShares = userBorrowShares[_borrower].toUint128();
+
+        // Prevent stack-too-deep
+        int256 _leftoverCollateral;
+        {
+            // Checks & Calculations
+            // Determine the liquidation amount in collateral units (i.e. how much debt is liquidator going to repay)
+            uint256 _liquidationAmountInCollateralUnits = ((_totalBorrow.toAmount(_sharesToLiquidate, false) *
+                _exchangeRate) / EXCHANGE_PRECISION);
+
+            // We first optimistically calculate the amount of collateral to give the liquidator based on the higher clean liquidation fee
+            // This fee only applies if the liquidator does a full liquidation
+            uint256 _optimisticCollateralForLiquidator = (_liquidationAmountInCollateralUnits *
+                (LIQ_PRECISION + cleanLiquidationFee)) / LIQ_PRECISION;
+
+            // Because interest accrues every block, _liquidationAmountInCollateralUnits from a few lines up is an ever increasing value
+            // This means that leftoverCollateral can occasionally go negative by a few hundred wei (cleanLiqFee premium covers this for liquidator)
+            _leftoverCollateral = (_userCollateralBalance.toInt256() - _optimisticCollateralForLiquidator.toInt256());
+
+            // If cleanLiquidation fee results in no leftover collateral, give liquidator all the collateral
+            // This will only be true when there liquidator is cleaning out the position
+            _collateralForLiquidator = _leftoverCollateral <= 0
+                ? _userCollateralBalance
+                : (_liquidationAmountInCollateralUnits * (LIQ_PRECISION + dirtyLiquidationFee)) / LIQ_PRECISION;
+        }
+        // Calced here for use during repayment, grouped with other calcs before effects start
+        uint128 _amountLiquidatorToRepay = (_totalBorrow.toAmount(_sharesToLiquidate, true)).toUint128();
+
+        // Determine if and how much debt to writeoff
+        // Note: ensures that sharesToLiquidate is never larger than borrowerShares
+        uint128 _sharesToAdjust;
+        uint128 _amountToAdjust;
+        {
+            if (_leftoverCollateral <= 0) {
+                uint128 _leftoverBorrowShares = _borrowerShares - _sharesToLiquidate;
+                if (_leftoverBorrowShares > 0) {
+                    // Write off bad debt
+                    _sharesToAdjust = _leftoverBorrowShares;
+                    _amountToAdjust = (_totalBorrow.toAmount(_sharesToAdjust, false)).toUint128();
+
+                    // Effects: write to state
+                    totalAsset.amount -= _amountToAdjust;
+
+                    // Note: Ensure this memory stuct will be passed to _repayAsset for write to state
+                    _totalBorrow.amount -= _amountToAdjust;
+                    _totalBorrow.shares -= _sharesToAdjust;
+                }
+            }
+        }
+
+        // Effects & Interactions
+        // NOTE: reverts if _shares > userBorrowShares
+        _repayAsset(_totalBorrow, _amountLiquidatorToRepay, _sharesToLiquidate, msg.sender, _borrower); // liquidator repays shares on behalf of borrower
+        // NOTE: reverts if _collateralForLiquidator > userCollateralBalance
+        // Collateral is removed on behalf of borrower and sent to liquidator
+        // NOTE: reverts if _collateralForLiquidator > userCollateralBalance
+        _removeCollateral(_collateralForLiquidator, msg.sender, _borrower);
+        emit Liquidate(
+            _borrower,
+            _collateralForLiquidator,
+            _sharesToLiquidate,
+            _amountLiquidatorToRepay,
+            _sharesToAdjust,
+            _amountToAdjust
+        );
     }
 
     // ============================================================================================
@@ -968,8 +1068,8 @@ abstract contract FraxlendPairCore is FraxlendPairConstants, IERC4626, ERC20, Ow
     )
         external
         isNotPastMaturity
-        whenNotPaused
         nonReentrant
+        whenNotPaused
         approvedBorrower
         isSolvent(msg.sender)
         returns (uint256 _totalCollateralBalance)

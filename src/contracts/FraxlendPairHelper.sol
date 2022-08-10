@@ -84,7 +84,7 @@ contract FraxlendPairHelper {
             ImmutablesUint256({
                 _oracleNormalization: _fraxlendPair.oracleNormalization(),
                 _maxLTV: _fraxlendPair.maxLTV(),
-                _liquidationFee: _fraxlendPair.liquidationFee(),
+                _liquidationFee: _fraxlendPair.cleanLiquidationFee(),
                 _maturityDate: _fraxlendPair.maturityDate(),
                 _penaltyRate: _fraxlendPair.penaltyRate()
             });
@@ -122,7 +122,7 @@ contract FraxlendPairHelper {
         _totalCollateral = _fraxlendPair.totalCollateral();
     }
 
-    function previewUpdateExchangeRate(address _fraxlendPairAddress) external view returns (uint256 _exchangeRate) {
+    function previewUpdateExchangeRate(address _fraxlendPairAddress) public view returns (uint256 _exchangeRate) {
         IFraxlendPair _fraxlendPair = IFraxlendPair(_fraxlendPairAddress);
         address _oracleMultiply = _fraxlendPair.oracleMultiply();
         address _oracleDivide = _fraxlendPair.oracleDivide();
@@ -235,6 +235,64 @@ contract FraxlendPairHelper {
         if (_feeToProtocolRate > 0) {
             _feesAmount = (_interestEarned * _feeToProtocolRate) / _FEE_PRECISION;
             _feesShare = (_feesAmount * _totalAssetShares) / (_totalAssetAmount + _interestEarned - _feesAmount);
+        }
+    }
+
+    function previewLiquidatePure(
+        address _fraxlendPairAddress,
+        uint128 _sharesToLiquidate,
+        address _borrower
+    )
+        public
+        view
+        returns (
+            uint128 _amountLiquidatorToRepay,
+            uint256 _collateralForLiquidator,
+            uint128 _sharesToSocialize,
+            uint128 _amountToSocialize
+        )
+    {
+        IFraxlendPair _fraxlendPair = IFraxlendPair(_fraxlendPairAddress);
+
+        VaultAccount memory _totalBorrow;
+        {
+            (uint128 _totalBorrowAmount, uint128 _totalBorrowShares) = _fraxlendPair.totalBorrow();
+            _totalBorrow = VaultAccount({ amount: _totalBorrowAmount, shares: _totalBorrowShares });
+        }
+
+        int256 _leftoverCollateral;
+        uint128 _borrowerShares;
+        {
+            uint256 _exchangeRate = previewUpdateExchangeRate(_fraxlendPairAddress);
+            _borrowerShares = _fraxlendPair.userBorrowShares(_borrower).toUint128();
+            (, uint256 _LIQ_PRECISION, , , uint256 _EXCHANGE_PRECISION, , , ) = _fraxlendPair.getConstants();
+            uint256 _userCollateralBalance = _fraxlendPair.userCollateralBalance(_borrower);
+            // Determine the liquidation amount in collateral units (i.e. how much debt is liquidator going to repay)
+            uint256 _liquidationAmountInCollateralUnits = ((_totalBorrow.toAmount(_borrowerShares, false) *
+                _exchangeRate) / _EXCHANGE_PRECISION);
+
+            // We first optimistically calculate the amount of collateral to give the liquidator based on the higher clean liquidation fee
+            // This fee only applies if the liquidator does a full liquidation
+            uint256 _optimisticCollateralForLiquidator = (_liquidationAmountInCollateralUnits *
+                (_LIQ_PRECISION + _fraxlendPair.cleanLiquidationFee())) / _LIQ_PRECISION;
+
+            // Because interest accrues every block, _liquidationAmountInCollateralUnits (line 913) is an ever increasing value
+            // This means that leftoverCollateral can occasionally go negative by a few hundred wei (cleanLiqFee premium covers this for liquidator)
+            _leftoverCollateral = (_userCollateralBalance.toInt256() - _optimisticCollateralForLiquidator.toInt256());
+            // If cleanLiquidation fee results in no leftover collateral, give liquidator all the collateral
+            // This will only be true when there liquidator is cleaning out the position
+            _collateralForLiquidator = _leftoverCollateral <= 0
+                ? _userCollateralBalance
+                : (_liquidationAmountInCollateralUnits * (_LIQ_PRECISION + _fraxlendPair.dirtyLiquidationFee())) /
+                    _LIQ_PRECISION;
+        }
+        _amountLiquidatorToRepay = (_totalBorrow.toAmount(_sharesToLiquidate, true)).toUint128();
+
+        // Determine if and how much debt to socialize
+        if (_leftoverCollateral <= 0 && (_borrowerShares - _sharesToLiquidate) > 0) {
+            // Socialize bad debt
+            _sharesToSocialize = _borrowerShares - _sharesToLiquidate;
+            _amountToSocialize = (_totalBorrow.toAmount(_sharesToSocialize, false)).toUint128();
         }
     }
 }
