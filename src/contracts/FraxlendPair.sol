@@ -194,13 +194,16 @@ contract FraxlendPair is FraxlendPairCore {
     // ============================================================================================
     // Functions: Protocol Configuration (Fees & Swap Contracts)
     // ============================================================================================
-    event SetTimeLock(address _newAddress);
+    /// @notice The ```SetTimeLock``` event fires when the TIME_LOCK_ADDRESS is set
+    /// @param _oldAddress The original address
+    /// @param _newAddress The new address
+    event SetTimeLock(address _oldAddress, address _newAddress);
 
     /// @notice The ```setTimeLock``` function sets the TIME_LOCK address
     /// @param _newAddress the new time lock address
     function setTimeLock(address _newAddress) external onlyOwner {
+        emit SetTimeLock(TIME_LOCK_ADDRESS, _newAddress);
         TIME_LOCK_ADDRESS = _newAddress;
-        emit SetTimeLock(_newAddress);
     }
 
     /// @notice The ```ChangeFee``` event first when the fee is changed
