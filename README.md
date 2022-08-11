@@ -114,7 +114,7 @@ fraxlendPairDeployer.deploy(_configData);
 
 # Building and Testing
 
-- First copy `.env.sample` to `.env` and fill in archival node URLs as well as a mnemonic (hardhat only)
+- First copy `.env.example` to `.env` and fill in archival node URLs as well as a mnemonic (hardhat only)
 - To download needed modules run `npm install`
 - This repository contains scripts to compile and test using both Hardhat and Foundry
 - To run foundry tests you will need to [make sure foundry is installed](https://book.getfoundry.sh/getting-started/installation)
@@ -158,7 +158,6 @@ Testing
 
 ## libraries/SafeERC20.sol
 
-- libraries/SafeERC20.sol
 - Contains helper functions to wrap the symbol(), name(), and decimal() functions found in ERC20 Metadata calls
 - Contains Open-Zeppelins SafeTransfer() and SafeTransferFrom() implementations
 - LOC: 52
