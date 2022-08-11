@@ -1,5 +1,3 @@
-# Readme
-
 # Fraxlend contest details
 
 - $50,000 USDC in awards
