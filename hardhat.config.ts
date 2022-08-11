@@ -68,7 +68,7 @@ const config: HardhatUserConfig = {
     artifacts: "./artifacts",
     cache: "./cache",
     sources: "./src",
-    tests: "./src/test",
+    tests: "./src/test/hardhat",
   },
   solidity: {
     compilers: [

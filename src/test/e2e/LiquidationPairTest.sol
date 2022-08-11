@@ -7,7 +7,6 @@ contract LiquidatePairTest is BasePairTest {
     using OracleHelper for AggregatorV3Interface;
     using SafeCast for uint256;
 
-
     function testLiquidate() public {
         // Setup contracts
         defaultSetUp();

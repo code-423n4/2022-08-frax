@@ -15,20 +15,39 @@
 
 ### [Fraxlend Documentation](https://docs.frax.finance/fraxlend/fraxlend-overview)
 
+## Contest Scope TLDR
+
+- Fraxlend Repository: [https://github.com/FraxFinance/fraxlend](https://github.com/FraxFinance/fraxlend)
+- 7 Non-library contracts in the scope
+- 1384 Total sLoC in scope.
+- 2 library dependencies
+- 4 structs, 1 external interface
+- Contracts use inheritance
+- 1 external function with external call to UniV2 router, 6 external functions with ERC-20 transfers, 1 external function with call to Chainlink oracle (No other oracles)
+- No other external context/code base required
+- FraxlendPair.sol conforms to ERC-4626 and ERC-20 standards
+- No novel or unique curve logic or mathematical models
+- No timelock function
+- Not an NFT
+- Not an AMM
+- Not a fork of a popular project
+- Does not use rollups
+- Single-chain only
+
 # Introduction to Fraxlend
 
-- The Fraxlend platform allows for the deployment of Fraxlend Pairs where each pair represents an isolated lending market.
-- Each pair is configured with one asset and one collateral token, Asset Tokens are borrowed by depositing Collateral Tokens.
+- The Fraxlend platform allows for the deployment of Fraxlend Pairs, each pair represents an isolated lending market.
+- Each pair is configured with one asset and one collateral token, Asset Tokens are borrowed by depositing Collateral Tokens.  Asset Tokens are lent in exchange for fTokens.  fTokens are redeemed for Asset Tokens plus accrued interest.
 - Each pair is configured to use one or two Chainlink oracle contracts to provide an exchange rate between the two assets.
-- Each pair is configured to use one Rate Calculator contracts to determine interest rates.
+- Each pair is configured to use one Rate Calculator contract to determine interest rates.
 
 ## Pair Interaction Overview
 
-![Overview](documentation/PairOverview.png)
+![https://github.com/FraxFinance/fraxlend/raw/main/documentation/_images/PairOverview.png](https://github.com/FraxFinance/fraxlend/raw/main/documentation/_images/PairOverview.png)
 
 # Deployment & Environment Setup
 
-- Fraxlend Pairs can only be deployed from the Fraxlend Pair Deployer
+- Fraxlend Pairs are intended to be deployed from the Fraxlend Pair Deployer
 - There are two ways to deploy a Fraxlend Pair:
     - Public Deploy - available to anyone but with limited configuration
     - Custom Deploy - available to whitelisted deployers
@@ -57,7 +76,7 @@
 ## Oracle Configuration
 
 - Each Fraxlend Pair takes in two oracle addresses and a normalization parameter.  The normalization parameter helps account for oracle count and for different decimal values between asset and collateral.
-- **exchangeRate** is a uint224 value and represents the amount of collateral to get 1e18 asset (collateral/asset)
+- **exchangeRate** is a uint224 value and represents the amount of collateral needed to exchange for 1e18 asset (collateral/asset)
 - `_oracleMultiply` - is the chainlink oracle which forms the numerator of the exchange rate
 - `_oracleDivide` - is the chainlink oracle address which forms the denominator of the exchange rate
 - `_oracleNormalization` - is a value which accounts for differences in precision across both oracles and the asset and denominator
@@ -95,25 +114,31 @@ fraxlendPairDeployer.deploy(_configData);
 
 # Building and Testing
 
-- First copy `sample.env` to `.env` and fill in archival node URLs as well as a mnemonic (hardhat only)
+- First copy `.env.sample` to `.env` and fill in archival node URLs as well as a mnemonic (hardhat only)
+- To download needed modules run `npm install`
 - This repository contains scripts to compile and test using both Hardhat and Foundry
-    - Compile
-        - `forge build`
-        - `npx hardhat compile`
-    - Testing
-        - `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK` (mainnet forking)
-        - `forge test` (without mainnet forking)
+- To run foundry tests you will need to [make sure foundry is installed](https://book.getfoundry.sh/getting-started/installation)
+- Install foundry submodules `git submodule init && git submodule update`
+
+Compilation
+
+- `forge build`
+- `npx hardhat compile`
+
+Testing
+
+- `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK`
 
 # Known Issues
 
 ### Misconfigured Oracles
 
-- It is possible to misconfigure pairs and choose oracles and oracle normalization that do not match the assets
+- It is possible to misconfigure pairs and choose oracles and oracle normalization that do not match the assets or that cause prices to be invalid
 - Assume that oracles and normalization are properly configured
 
 ### Low borrow balance combined with low interest rates
 
-- When there is an exceptionally low borrow balance and a low interest rate, interest does not accrue
+- When there is an exceptionally low borrow balance and a low interest rate, interest does not accrue due to rounding
 
 ### Custom Deployment Misconfiguration
 
@@ -140,7 +165,7 @@ fraxlendPairDeployer.deploy(_configData);
 
 ## libraries/VaultAccount.sol
 
-- Defines the VaultAccount struct, an instance of the struct is used to keep track of the accounting for borrows and for asset lending (see [Fraxlend - Advanced Concepts - Vault Accoun](https://www.notion.so/Contracts-Under-Review-b37a6521ca4a474aa37cdef5dbf95f7b)[t](https://docs.frax.finance/fraxlend/advanced-concepts/vault-account))
+- Defines the VaultAccount struct, an instance of the struct is used to keep track of the accounting for borrows and for asset lending (see [Fraxlend - Advanced Concepts - Vault Account](https://docs.frax.finance/fraxlend/advanced-concepts/vault-account))
 - Provides helper functions for converting between shares and amounts
 - LOC: 35
 
@@ -150,7 +175,7 @@ fraxlendPairDeployer.deploy(_configData);
 - Provides logic for calculating the new interest rate as a function of utilization %
 - Holds no state
 - See: [Fraxlend - Advanced Concepts - Linear Rate](https://docs.frax.finance/fraxlend/advanced-concepts/interest-rates#linear-rate) for an explanation of the math
-- LOC: 46
+- LOC: 49
 
 ## VariableInterestRate.sol
 
@@ -171,7 +196,7 @@ fraxlendPairDeployer.deploy(_configData);
 
 - Defines constants and errors only
 - Inherited by tests and FraxlendPairCore
-- LOC: 33
+- LOC: 32
 
 ## FraxlendPairCore.sol
 
@@ -189,7 +214,7 @@ fraxlendPairDeployer.deploy(_configData);
     - Leverage and RepayAssetWithCollateral interact with a whitelisted swapper contract which adheres to the Uniswap V2 Router interface
     - _updateExchangeRate interacts with the two chainlink oracles
     - _addInterest interacts with the configured Rate Calculator contract (adheres to IRateCalculator.sol interface)
-- LOC: 642
+- LOC: 693
 
 ## FraxlendPair.sol
 
@@ -200,7 +225,7 @@ fraxlendPairDeployer.deploy(_configData);
 - WithdrawFees
 - Pause/Unpause
 - SetApprovedBorrower/Lender
-- LOC: 189
+- LOC: 197
 
 ## FraxlendPairDeployer.sol
 
@@ -216,9 +241,9 @@ fraxlendPairDeployer.deploy(_configData);
 - **External Contract Interactions:**
     - During customDeployment, calls FraxlendWhitelist to make sure deployer is on whitelist
     - After initial deployment calls initialize() and transferOwnership() on the deployed FraxlendPair instance
-- LOC: 252
+- LOC: 257
 
-## Total LOC: 1,318
+## Total LOC: 1,384
 
 # Contracts Included but not under review
 
@@ -226,3 +251,7 @@ fraxlendPairDeployer.deploy(_configData);
 
 - This contract contains view functions for previewing interest accrued and updating exchange rate
 - Can be helpful for predicting the effects of your transaction prior to execution
+
+## interfaces/*
+
+- Interfaces provided for reference but are not included in audit
