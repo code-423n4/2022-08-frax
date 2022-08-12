@@ -154,19 +154,19 @@ Testing
 
 # Contracts Under Review
 
-## libraries/SafeERC20.sol
+## [libraries/SafeERC20.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/libraries/SafeERC20.sol)
 
 - Contains helper functions to wrap the symbol(), name(), and decimal() functions found in ERC20 Metadata calls
 - Contains Open-Zeppelins SafeTransfer() and SafeTransferFrom() implementations
 - LOC: 52
 
-## libraries/VaultAccount.sol
+## [libraries/VaultAccount.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/libraries/VaultAccount.sol)
 
 - Defines the VaultAccount struct, an instance of the struct is used to keep track of the accounting for borrows and for asset lending (see [Fraxlend - Advanced Concepts - Vault Account](https://docs.frax.finance/fraxlend/advanced-concepts/vault-account))
 - Provides helper functions for converting between shares and amounts
 - LOC: 35
 
-## LinearInterestRate.sol
+## [LinearInterestRate.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/LinearInterestRate.sol)
 
 - Adheres to the IRateCalculator.sol interface
 - Provides logic for calculating the new interest rate as a function of utilization %
@@ -174,14 +174,14 @@ Testing
 - See: [Fraxlend - Advanced Concepts - Linear Rate](https://docs.frax.finance/fraxlend/advanced-concepts/interest-rates#linear-rate) for an explanation of the math
 - LOC: 49
 
-## VariableInterestRate.sol
+## [VariableInterestRate.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/VariableInterestRate.sol)
 
 - Adheres to the IRateCalculator interface
 - Provides logic for calculating the new interest rate as a function of utilization and time
 - See: [Fraxlend - Advanced Concepts - Time-Weighted Variable Rate](https://docs.frax.finance/fraxlend/advanced-concepts/interest-rates#time-weighted-variable-interest-rate) for an explanation of the math
 - LOC: 40
 
-## FraxlendWhitelist.sol
+## [FraxlendWhitelist.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendWhitelist.sol)
 
 - Provides 3 whitelists:
     - RateCalculatorWhitelist - controls which calculators can be used for rate calculations
@@ -189,13 +189,13 @@ Testing
     - DeployerWhitelist - controls which addresses can deploy custom Fraxlend Pair instances
 - LOC: 29
 
-## FraxlendPairConstants.sol
+## [FraxlendPairConstants.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendPairConstants.sol)
 
 - Defines constants and errors only
 - Inherited by tests and FraxlendPairCore
 - LOC: 32
 
-## FraxlendPairCore.sol
+## [FraxlendPairCore.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendPairCore.sol)
 
 - Contains all external functions without access modifiers
 - Contains core logic for the pair
@@ -213,7 +213,7 @@ Testing
     - _addInterest interacts with the configured Rate Calculator contract (adheres to IRateCalculator.sol interface)
 - LOC: 693
 
-## FraxlendPair.sol
+## [FraxlendPair.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendPair.sol)
 
 - Contains all view functions necessary to adhere to ERC-4626
 - Contains access controlled configuration functions including
@@ -224,7 +224,7 @@ Testing
 - SetApprovedBorrower/Lender
 - LOC: 197
 
-## FraxlendPairDeployer.sol
+## [FraxlendPairDeployer.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendPairDeployer.sol)
 
 - Contains logic to deploy two pair types: Custom and Public
     - Public pairs are permissionlessly deployed
@@ -244,7 +244,7 @@ Testing
 
 # Contracts Included but not under review
 
-## FraxlendPairHelper.sol
+## [FraxlendPairHelper.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendPairHelper.sol)
 
 - This contract contains view functions for previewing interest accrued and updating exchange rate
 - Can be helpful for predicting the effects of your transaction prior to execution
