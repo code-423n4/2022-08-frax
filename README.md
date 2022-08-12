@@ -162,7 +162,7 @@ Testing without Fuzz Testing
 
 ### Frax Price Volatility
 
-- Because $FRAX is treated as having a price of $1, $FRAX price volatility could cause bad debt or unnecessary liquidations
+- Because FRAX is treated as having a price of $1, $FRAX price volatility could cause bad debt or unnecessary liquidations
 
 # Contracts Under Review
 
