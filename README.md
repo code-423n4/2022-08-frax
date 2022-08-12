@@ -69,7 +69,7 @@
 1. Deploy rate contracts, LinearInterestRate.sol and VariableInterestRate.sol
 2. Deploy Fraxlend Whitelist and set owner to COMPTROLLER_ADDRESS
 3. Whitelist intended oracles (chainlink crypto only, no FRAX oracles)
-    1. Use $USD value for $FRAX, no $FRAX price oracles whitelisted.
+    1. Use USDvalueforUSD value for USDvalueforFRAX, no $FRAX price oracles whitelisted.
 4. Whitelist intended rateContracts from step 1
 5. Whitelist intended custom deployment addresses
 6. Deploy Fraxlend Deployer with proper constructor arguments and set owner to COMPTROLLER_ADDRESS
