@@ -127,6 +127,13 @@ Testing
 
 - `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK`
 
+### Slither Static Analyzer
+
+- If you would like to run slither, move the `src/contracts` directory to the root directory by running `mv src/contracts contracts`
+- Then update key `config.paths.sources` in `hardhat.config.ts` (line 70) to be:
+    - `sources: "./contracts"`
+- Then run `slither .`
+
 # Known Issues
 
 ### Misconfigured Oracles
