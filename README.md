@@ -1,6 +1,3 @@
-<br>
-<br>
-
 # Fraxlend contest details
 
 - $50,000 USDC in awards
@@ -83,7 +80,7 @@
 
 ## Oracle Configuration
 
-- Each Fraxlend Pair takes in two oracle addresses and a normalization parameter.  The normalization parameter helps account for oracle count and for different decimal values between asset and collateral.
+- Each Fraxlend Pair takes in two oracle addresses and a normalization parameter.  The normalization parameter helps account for oracle precision and for different decimal values between asset and collateral.
 - **exchangeRate** is a uint224 value and represents the amount of collateral needed to exchange for 1e18 asset (collateral/asset)
 - `_oracleMultiply` - is the chainlink oracle which forms the numerator of the exchange rate
 - `_oracleDivide` - is the chainlink oracle address which forms the denominator of the exchange rate
@@ -129,16 +126,18 @@ fraxlendPairDeployer.deploy(_configData);
 - To download needed modules run `npm install`
 - This repository contains scripts to compile and test using both Hardhat and Foundry
 - To run foundry tests you will need to [make sure foundry is installed](https://book.getfoundry.sh/getting-started/installation)
-- Install foundry submodules `git submodule init && git submodule update`
 
 Compilation
 
 - `forge build`
 - `npx hardhat compile`
 
-Testing
+Testing with Fuzz Testing (can take a while)
 
 - `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK`
+  
+Testing without Fuzz Testing
+- `source .env && forge test --fork-url $MAINNET_URL --fork-block-number $DEFAULT_FORK_BLOCK --no-match-test=".*Fuzz.*"`
 
 ### Slither Static Analyzer
 
@@ -204,6 +203,7 @@ Testing
 
 - Adheres to the IRateCalculator interface
 - Provides logic for calculating the new interest rate as a function of utilization and time
+- Holds no state
 - See: [Fraxlend - Advanced Concepts - Time-Weighted Variable Rate](https://docs.frax.finance/fraxlend/advanced-concepts/interest-rates#time-weighted-variable-interest-rate) for an explanation of the math
 - LOC: 40
 
@@ -223,12 +223,12 @@ Testing
 
 ## [FraxlendPairCore.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendPairCore.sol)
 
-- Contains all external functions without access modifiers
+- Contains all external state-modifying functions without access modifiers (i.e callable by anyone)
 - Contains core logic for the pair
 - Contains all state for the pair
 - Inherited by FraxlendPair
 - **Libraries:**
-    - VaultAccount
+    - VaultAccount (libraries/VaultAccount.sol)
     - SafeERC20 (libraries/SafeERC20.sol)
 - **External Contract Interactions**:
     - During deployment the constructor Interacts with the FraxlendWhitelist to ensure the configured oracles and rate contracts have been whitelisted
@@ -243,11 +243,11 @@ Testing
 
 - Contains all view functions necessary to adhere to ERC-4626
 - Contains access controlled configuration functions including
-- SetSwapper,
-- ChangeFee
-- WithdrawFees
-- Pause/Unpause
-- SetApprovedBorrower/Lender
+  - SetSwapper,
+  - ChangeFee
+  - WithdrawFees
+  - Pause/Unpause
+  - SetApprovedBorrower/Lender
 - LOC: 197
 
 ## [FraxlendPairDeployer.sol](https://github.com/code-423n4/2022-08-frax/blob/main/src/contracts/FraxlendPairDeployer.sol)
@@ -258,7 +258,7 @@ Testing
 - Stores information about pairs deployed like name, address, and whether they are custom pairs
 - Contains the globalPause function which bulk pauses deployed fraxlend pairs
 - **Libraries:**
-    - https://github.com/GNSPS/solidity-bytes-utils: Used to concatenate creation code during deployment
+    - [solidity-bytes-utils](https://github.com/GNSPS/solidity-bytes-utils): Used to concatenate creation code during deployment
     - Strings library from Open Zeppelin
     - SafeERC20 (libraries/SafeERC20.sol)
 - **External Contract Interactions:**
