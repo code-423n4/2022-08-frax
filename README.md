@@ -1,3 +1,6 @@
+<br>
+<br>
+
 # Fraxlend contest details
 
 - $50,000 USDC in awards
@@ -9,11 +12,7 @@
 - Starts Aug 11, 2022 20:00 UTC
 - Ends Aug 16, 2022 20:00 UTC
 
----
-
-### [Fraxlend Documentation](https://docs.frax.finance/fraxlend/fraxlend-overview)
-
-## Contest Scope TLDR
+### Contest Scope TLDR
 
 - Fraxlend Repository: [https://github.com/FraxFinance/fraxlend](https://github.com/FraxFinance/fraxlend)
 - 7 Non-library contracts in the scope
@@ -32,6 +31,14 @@
 - Does not use rollups
 - Single-chain only
 
+---
+<br>
+
+# [Fraxlend Documentation](https://docs.frax.finance/fraxlend/fraxlend-overview)
+
+# [Video Overview & Code Walkthroughs](https://0xevans.notion.site/Fraxlend-Video-Walkthroughs-a8a6d5659f354548a4cc3c1bafc4f77d)
+
+
 # Introduction to Fraxlend
 
 - The Fraxlend platform allows for the deployment of Fraxlend Pairs, each pair represents an isolated lending market.
@@ -42,6 +49,9 @@
 ## Pair Interaction Overview
 
 ![https://github.com/FraxFinance/fraxlend/raw/main/documentation/_images/PairOverview.png](https://github.com/FraxFinance/fraxlend/raw/main/documentation/_images/PairOverview.png)
+
+<br>
+<br>
 
 # Deployment & Environment Setup
 
@@ -110,6 +120,9 @@ bytes memory _configData = abi.encode(
 fraxlendPairDeployer.deploy(_configData);
 ```
 
+<br>
+<br>
+
 # Building and Testing
 
 - First copy `.env.example` to `.env` and fill in archival node URLs as well as a mnemonic (hardhat only)
@@ -133,6 +146,9 @@ Testing
 - Then update key `config.paths.sources` in `hardhat.config.ts` (line 70) to be:
     - `sources: "./contracts"`
 - Then run `slither .`
+
+<br>
+<br>
 
 # Known Issues
 
@@ -158,6 +174,9 @@ Testing
 ### Frax Price Volatility
 
 - Because $FRAX is treated as having a price of $1, $FRAX price volatility could cause bad debt or unnecessary liquidations
+
+<br>
+<br>
 
 # Contracts Under Review
 
@@ -248,6 +267,9 @@ Testing
 - LOC: 257
 
 ## Total LOC: 1,384
+
+<br>
+<br>
 
 # Contracts Included but not under review
 
