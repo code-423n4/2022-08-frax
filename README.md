@@ -69,7 +69,7 @@
 1. Deploy rate contracts, LinearInterestRate.sol and VariableInterestRate.sol
 2. Deploy Fraxlend Whitelist and set owner to COMPTROLLER_ADDRESS
 3. Whitelist intended oracles (chainlink crypto only, no FRAX oracles)
-    1. Use USDvalueforUSD value for USDvalueforFRAX, no $FRAX price oracles whitelisted.
+    1.Use &#36;USD value for &#36;FRAX, no &#36;FRAX price oracles whitelisted.
 4. Whitelist intended rateContracts from step 1
 5. Whitelist intended custom deployment addresses
 6. Deploy Fraxlend Deployer with proper constructor arguments and set owner to COMPTROLLER_ADDRESS
@@ -162,7 +162,7 @@ Testing without Fuzz Testing
 
 ### Frax Price Volatility
 
-- Because FRAX is treated as having a price of 1, FRAX price volatility could cause bad debt or unnecessary liquidations
+- Because &#36;FRAX is treated as having a price of &#36;1, &#36;FRAX price volatility could cause bad debt or unnecessary liquidations
 
 # Contracts Under Review
 
