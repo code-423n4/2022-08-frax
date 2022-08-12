@@ -29,7 +29,6 @@
 - Single-chain only
 
 ---
-<br>
 
 # [Fraxlend Documentation](https://docs.frax.finance/fraxlend/fraxlend-overview)
 
@@ -46,9 +45,6 @@
 ## Pair Interaction Overview
 
 ![https://github.com/FraxFinance/fraxlend/raw/main/documentation/_images/PairOverview.png](https://github.com/FraxFinance/fraxlend/raw/main/documentation/_images/PairOverview.png)
-
-<br>
-<br>
 
 # Deployment & Environment Setup
 
@@ -117,9 +113,6 @@ bytes memory _configData = abi.encode(
 fraxlendPairDeployer.deploy(_configData);
 ```
 
-<br>
-<br>
-
 # Building and Testing
 
 - First copy `.env.example` to `.env` and fill in archival node URLs as well as a mnemonic (hardhat only)
@@ -146,9 +139,6 @@ Testing without Fuzz Testing
     - `sources: "./contracts"`
 - Then run `slither .`
 
-<br>
-<br>
-
 # Known Issues
 
 ### Misconfigured Oracles
@@ -173,9 +163,6 @@ Testing without Fuzz Testing
 ### Frax Price Volatility
 
 - Because $FRAX is treated as having a price of $1, $FRAX price volatility could cause bad debt or unnecessary liquidations
-
-<br>
-<br>
 
 # Contracts Under Review
 
@@ -267,9 +254,6 @@ Testing without Fuzz Testing
 - LOC: 257
 
 ## Total LOC: 1,384
-
-<br>
-<br>
 
 # Contracts Included but not under review
 
